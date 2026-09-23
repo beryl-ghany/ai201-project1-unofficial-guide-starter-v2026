@@ -58,7 +58,9 @@ Morrow House — what it's actually like Just finished a year in this building. 
 **Answer:**
 
 ```
-(Paste after running with your GEMINI_API_KEY — see note below.)
+No, the housing lottery is not completely random for juniors and seniors. They are ordered by accumulated credit hours first, and ties are broken randomly. (Source: admin_housing_lottery.txt)
+
+Sources retrieved: admin_housing_lottery.txt, admin_parking_permits.txt, advising_registration.txt, housing_innisfree_hall.txt, housing_tamsin_court.txt
 ```
 
 **My relevance cutoff:** 0.55
