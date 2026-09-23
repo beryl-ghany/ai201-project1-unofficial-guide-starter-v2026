@@ -23,6 +23,7 @@ your pipeline, not giving up.
 """
 
 from dataclasses import dataclass
+import re
 
 import config
 from ingest import Document
@@ -80,24 +81,117 @@ def fallback_split(
     return chunks
 
 
+def _split_sentences(text: str) -> list[str]:
+    """Split on sentence endings while keeping the punctuation with the sentence."""
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _pack_units(units: list[str], chunk_size: int, overlap: int) -> list[str]:
+    """
+    Pack sentence/paragraph units into chunks under chunk_size.
+
+    When the next unit would blow the limit, start a new chunk that begins with
+    enough trailing text from the previous chunk to cover `overlap` characters
+    (preferring whole units when they fit).
+    """
+    if not units:
+        return []
+
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+
+    def flush() -> None:
+        nonlocal current, current_len
+        if current:
+            chunks.append(" ".join(current).strip())
+            current = []
+            current_len = 0
+
+    for unit in units:
+        unit_len = len(unit)
+        # Single unit longer than the window — hard-split with character overlap.
+        if unit_len > chunk_size:
+            flush()
+            start = 0
+            while start < unit_len:
+                piece = unit[start : start + chunk_size].strip()
+                if piece:
+                    chunks.append(piece)
+                if start + chunk_size >= unit_len:
+                    break
+                start += chunk_size - overlap
+            continue
+
+        separator = 1 if current else 0  # space between units
+        if current and current_len + separator + unit_len > chunk_size:
+            flush()
+            # Seed the next chunk with trailing units for overlap.
+            if chunks and overlap > 0:
+                seed: list[str] = []
+                seed_len = 0
+                for prev in reversed(_split_sentences(chunks[-1])):
+                    add = len(prev) + (1 if seed else 0)
+                    if seed and seed_len + add > overlap:
+                        break
+                    seed.insert(0, prev)
+                    seed_len += add
+                current = seed
+                current_len = seed_len
+
+        if current:
+            current_len += 1 + unit_len
+        else:
+            current_len = unit_len
+        current.append(unit)
+
+    flush()
+    return [c for c in chunks if c]
+
+
 def split_documents(documents: list[Document]) -> list[Chunk]:
     """
-    Split documents into chunks. ⚠️ REPLACE THE BODY OF THIS IN MILESTONE 3.
+    Paragraph-aware chunker tuned for short campus_life posts.
 
-    Right now it just calls the fallback. That is the plain, generic behaviour
-    the brief is talking about.
-
-    When you write your own strategy, set `produced_by` to
-    "chunker.py::split_documents" so your README's Sample Chunks section names
-    the right function. `app.py chunks` prints that string for you.
-
-    Things worth thinking about before you write any code:
-      - Are your documents short posts or long guides?
-      - Is the useful information in one sentence, or spread over a paragraph?
-      - Would splitting on paragraph breaks keep more thoughts intact than
-        splitting on a character count?
+    Most posts are under ~500 characters and already one complete thought, so
+    we keep those whole. When a post has multiple paragraphs, we split on the
+    blank line and pack sentences so a useful fact is not glued to an unrelated
+    one. Long pieces fall back to sentence packing with overlap.
     """
-    return fallback_split(documents)
+    chunk_size = config.CHUNK_SIZE
+    overlap = config.CHUNK_OVERLAP
+    min_keep_whole = min(chunk_size, 420)
+
+    if overlap >= chunk_size:
+        raise ValueError("overlap has to be smaller than chunk_size")
+
+    chunks: list[Chunk] = []
+    for doc in documents:
+        text = doc.text.strip()
+        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+
+        pieces: list[str]
+        if len(text) <= min_keep_whole and len(paragraphs) <= 2:
+            # Short one-thought posts stay intact — the right call for campus_life.
+            pieces = [text]
+        else:
+            units: list[str] = []
+            for para in paragraphs:
+                units.extend(_split_sentences(para.replace("\n", " ")))
+            pieces = _pack_units(units, chunk_size, overlap)
+
+        for index, piece in enumerate(pieces):
+            chunks.append(
+                Chunk(
+                    text=piece,
+                    source=doc.source,
+                    index=index,
+                    produced_by="chunker.py::split_documents",
+                )
+            )
+
+    return chunks
 
 
 def describe(chunks: list[Chunk]) -> str:
