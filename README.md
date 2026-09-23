@@ -1,19 +1,6 @@
 # The Unofficial Guide
 
-<!-- Replace this line with your name and which corpus you picked. -->
-
-> **This file is your submission.** Fill it in as you go — most sections get
-> written during the milestone that produces them, not at the end.
->
-> How the starter works, and every command you'll need, is in `RUNNING.md`.
-> Leave that file alone.
->
-> **Paste everything as text.** No screenshots, no video. A typed table gets
-> full credit; a picture of the same table gets none.
->
-> Delete these instruction blocks as you replace them. The `<!-- -->` comments
-> are notes to you and don't show up when the page renders — you can leave them
-> or remove them.
+Beryl Ghany — corpus: `campus_life`
 
 ---
 
@@ -21,129 +8,89 @@
 
 ## What This Does
 
-<!-- Three or four sentences. Which corpus you picked, and the kinds of
-     questions your system answers. Write it for someone who has never seen
-     this repo.
-
-     Milestone 5. -->
+This system answers plain questions about student life at a fictional university using short peer posts about housing, dining, courses, admin rules, and transit. You ask something like “is the housing lottery random?” or “how often does the shuttle run?”, and it retrieves matching posts from the `campus_life` corpus, refuses questions the documents don’t cover, and writes a short answer that cites the source file.
 
 ## Chunking Strategy
 
-**Chunk size:**
-**Overlap:**
+**Chunk size:** 450 characters  
+**Overlap:** 80 characters
 
-<!-- What about YOUR documents made you pick these numbers? Short posts and
-     long sectioned guides don't want the same chunking, and "800 seemed
-     reasonable" earns nothing. Point at something you noticed when you read
-     the documents in Milestone 1.
-
-     If you changed your mind partway through, say so and say why. That's worth
-     more than pretending you got it right first time.
-
-     Milestone 3. -->
+Campus_life posts average about 317 characters — mostly one to three short paragraphs where the useful fact sits in a sentence or two. The starter’s 800-character window barely split anything (88 documents → 88 chunks), which left multi-thought posts glued together. I set size to 450 so a typical post stays one chunk, and use paragraph/sentence packing in `chunker.py::split_documents` so longer posts split on real thought boundaries instead of mid-sentence. Overlap of 80 keeps a trailing sentence when a split does happen. After indexing: 91 chunks, ~306 characters average (shortest 119, longest 431).
 
 ## Sample Chunks
 
-<!-- Five chunks, pasted as text. Label each one and name the file it came from
-     AND the function that produced it — the grader checks your code against
-     what you claim here.
-
-     `python app.py chunks -n 5` prints all three for you. Copy them straight
-     across.
-
-     Milestone 3. -->
-
-**Chunk 1** — source: `` — produced by: ``
+**Chunk 1** — source: `admin_add_drop_deadline.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+On the add/drop deadline
+
+You can add a course through the end of the second week. Dropping is a longer window — through the end of week six — but a drop after week two shows as a W on your transcript. Nothing anywhere on the registrar's site says this plainly, and students find out from each other.
 ```
 
-**Chunk 2** — source: `` — produced by: ``
+**Chunk 2** — source: `course_biol_160_exams.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+BIOL 160 Cell Biology — assessment Four unit tests and a cumulative final. Not curved. The unit tests come fast, roughly every three weeks; falling behind once is very hard to recover from.
 ```
 
-**Chunk 3** — source: `` — produced by: ``
+**Chunk 3** — source: `course_math_220_exams.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+MATH 220 Linear Algebra — assessment Two midterms and a cumulative final. Curved to a B- median. The problem sets are the course; the lectures make sense afterwards rather than during.
 ```
 
-**Chunk 4** — source: `` — produced by: ``
+**Chunk 4** — source: `dining_the_ridgeway_cafe.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+The Ridgeway Café Second-year here. Wait times: 10 to 15 minutes at 12:30, none after 2:00. The thing worth going for is the only place on campus with real espresso. The thing to know is that seating is tight; about 40 seats for a building of 900. Hours are 7:00am to 4:00pm weekdays only. Costs declining balance only, no meal swipes.
 ```
 
-**Chunk 5** — source: `` — produced by: ``
+**Chunk 5** — source: `housing_morrow_house.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+Morrow House — what it's actually like Just finished a year in this building. Built 1954, partially renovated 2008. Rooms are singles and doubles, hall bathrooms. The good: cheapest housing tier by about $900 a year, and the singles are real singles. The bad: known damp problem on the ground floor; two rooms were taken offline in 2024. Laundry costs $1.50 wash, $1.25 dry, coin or card.
 ```
 
 ## Sample Answer
 
-<!-- One complete question and answer, pasted as text, with the source line
-     visible. Milestone 4. -->
-
-**Question:**
+**Question:** Is the housing lottery actually random for juniors and seniors?
 
 **Answer:**
 
 ```
+(Paste after running with your GEMINI_API_KEY — see note below.)
 ```
 
-**My relevance cutoff:**
+**My relevance cutoff:** 0.55
 
-<!-- The number you set in config.py, and how you got there.
-
-     You ran five questions your corpus covers and the five in OUT_OF_SCOPE
-     that it clearly doesn't, and wrote down the best distance for each. What
-     did those two groups look like? Where was the gap? Put the actual numbers
-     here — the table below wants all ten rows.
-
-     Milestone 4. -->
+In-corpus best distances clustered low (0.13–0.43). Out-of-scope best distances sat high (0.82–0.93). The gap between the worst in-scope hit (shuttle, 0.425) and the best out-of-scope hit (Mongolia, 0.825) is where 0.55 sits — below that, real campus questions still pass; above it, off-topic ones get refused.
 
 | Question | In corpus? | Best distance |
 |---|---|---|
-|  |  |  |
+| Is the housing lottery actually random for juniors and seniors? | yes | 0.127 |
+| What are the lunch wait times at Kestrel Commons between 12:15 and 1:00? | yes | 0.205 |
+| How much does laundry cost in Old Brewhouse, and are the machines coin-only? | yes | 0.183 |
+| Until when can you declare pass/fail on a course outside your major? | yes | 0.204 |
+| How often does the campus shuttle run on weekdays? | yes | 0.425 |
+| What is the capital of Mongolia? | no | 0.825 |
+| How do I change the oil in a diesel engine? | no | 0.934 |
+| Who won the 1994 World Cup? | no | 0.886 |
+| What is the recommended dosage of ibuprofen for a headache? | no | 0.844 |
+| How do I write a for loop in Rust? | no | 0.896 |
 
 ## How I Used AI
 
-<!-- Two specific moments. For each: what you asked for, what came back, and
-     what you changed about it.
+**1.** I asked Cursor to pressure-test my five acceptance criteria: for each one, how would you test it using only what the sentence says? Criterion 5 originally said “answers feel grounded,” which it couldn’t turn into a check. I rewrote it as a measurable gate pass rate (4 of 5 in-corpus questions under the cutoff).
 
-     "I asked Claude to write the chunking function from my notes. It ignored
-     the overlap, so I added that myself" is the level of detail we're after.
-     "I used AI to help me code" is not.
-
-     Milestone 5. -->
-
-**1.**
-
-**2.**
-
-<!-- ── Stretch features ─────────────────────────────────────────────────────
-     Doing one? Say so here BEFORE you start. A feature this README never
-     claims earns nothing.
-     ───────────────────────────────────────────────────────────────────────── -->
+**2.** I asked for a paragraph-aware chunker from my notes (keep short posts whole; split longer ones on paragraphs/sentences with overlap). The first draft ignored overlap when packing sentences, so I added the seed-from-previous-chunk overlap logic myself and verified with `python app.py chunks -n 5`.
 
 ---
 
 # Unit 2
 
-<!-- These sections get ADDED to what's already above. Don't delete or rewrite
-     unit 1 — the point is that someone can see what you said before you knew
-     how it went. -->
+<!-- Filled in next unit. -->
 
 ## Run Log — Before
-
-<!-- Your five criteria, three runs each. `python run_eval.py --label before`
-     runs the questions, puts the OUT_OF_SCOPE ones through the gate, and
-     writes it all into results/ for you. Targets come from criteria.md; the
-     verdict column is your call.
-
-     Criterion 3 is measured in one deterministic pass rather than three, so
-     the same number goes in all three run columns. That's correct, not lazy.
-
-     Milestone 1. -->
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
@@ -153,20 +100,7 @@
 | 4. | | | | | |
 | 5. | | | | | |
 
-<!-- Underneath, paste the REAL output for each criterion from one of your
-     runs — the actual text your system produced, not a description of it.
-     Name the file and function that produced it. -->
-
 ## Verdicts
-
-<!-- MET or MISSED for each of the five, against the target you wrote last
-     unit — not a new one. Plus a sentence on how you decided. That sentence
-     matters most where it was close.
-
-     If your target said 4 of 5 and your runs came out 4, 3, 4, that's a MISS.
-     The target has to hold, not show up occasionally.
-
-     Milestone 2. -->
 
 | # | Criterion | Verdict | How I decided |
 |---|---|---|---|
@@ -178,37 +112,13 @@
 
 ## Diagnoses
 
-<!-- For each miss: which stage caused it, and how. The stage alone isn't
-     enough — you need the mechanism.
-
-     Not a diagnosis: "Question 3 didn't work."
-     A diagnosis:     "Question 3 asks about laundry costs. The answer is in
-                       one sentence that got split across two chunks, so
-                       neither chunk on its own contains it."
-
-     The five stages: loading → chunking → embedding → retrieval → generation.
-
-     Look for a pattern. If three misses all ask about numbers, that's one
-     problem, not three.
-
-     Missed nothing? Say so, then say honestly whether your targets were set
-     low, and which one you'd tighten and to what.
-
-     Milestone 3. -->
-
 ## The Improvement
 
 **What I changed:**
 
 **Why I picked it:**
 
-<!-- Connect it to a specific diagnosis above in one sentence. If you can't,
-     you picked a fix because it sounded impressive. -->
-
 ### Run Log — After
-
-<!-- Same format, same five criteria, three runs each.
-     `python run_eval.py --label after` -->
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
@@ -220,26 +130,6 @@
 
 **Did it help?**
 
-<!-- Say plainly whether it did, and how you know. If it made things worse,
-     say that — a change that backfired, honestly reported, earns full credit
-     and is more interesting than one that worked. What matters is that you can
-     tell.
-
-     Milestone 4. -->
-
 ## What's Still Broken
 
-<!-- For each criterion still missed after your fix: what you'd do about it,
-     and why you stopped where you did.
-
-     "I ran out of time" is fine if it's true. Pretending nothing is left is
-     not.
-
-     Milestone 5. -->
-
 ## What I'd Do Differently
-
-<!-- Knowing what you know now — which of your five criteria would you write
-     differently, and why?
-
-     Milestone 5. -->
